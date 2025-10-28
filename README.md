@@ -45,11 +45,19 @@
 >请**按照注释，按需修改**代码第125、130和131行的内容。
 >![截图](https://github.com/PaimonAnimation/bilibili-comment-manage/blob/main/pictures/2.png)
 
+# 待更新
+
+- [ ] 继续添加 Firefox 浏览器的支持
+
 # 更新记录
 
-## 2.3（画大饼）
-- [ ] 把数据库文件修改为 `yaml` 格式
-- [ ] 继续添加 Firefox 浏览器的支持
+## 3.0 
+把函数写成类 </br>
+异步支持 </br>
+MongoDB数据库支持 </br>
+日志 </br>
+配置文件支持 </br>
+类型注解
 
 ## 2.2 (Feb 21 2025)
 更新了Edge支持
