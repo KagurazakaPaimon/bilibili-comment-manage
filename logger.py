@@ -48,9 +48,4 @@ def setup_logger(filename:str,cmd_level:Literal["INFO","DEBUG"]="INFO") -> loggi
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
     
-    def handle_exception(exc_type, exc_value, exc_traceback):
-        logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
-    
-    sys.excepthook = handle_exception
-    
     return logger

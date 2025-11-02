@@ -4,13 +4,14 @@ import os
 import re
 import traceback
 from collections import deque
+from logging import Logger
 from typing import List, Dict, Any
 from bilibili_api import comment, user
 from bilibili_api.user import RelationType
 from bilibili_api import Credential, video, sync
 from logger import setup_logger
 
-logger = setup_logger(filename='bot', cmd_level="DEBUG")
+
 
 # 重要数据
 #
@@ -27,44 +28,53 @@ logger = setup_logger(filename='bot', cmd_level="DEBUG")
 # {sub_comment['content']} 内容
 
 class BilibiliCommentManager:
-    def __init__(self, sessdata:str, bili_jct:str, bvid:str, ac_time_value:str, violation_words:list[str]) -> None:
+    async def __init__(
+                        self, 
+                        sessdata:str, 
+                        bili_jct:str, 
+                        bvid:str, 
+                        ac_time_value:str, 
+                        violation_words:list[str],
+                        logger:Logger) -> None:
         """
         初始化Bilibili评论管理器
         
         Args:
             sessdata (str): sessdata凭证
             bili_jct (str): bili_jct凭证
+            ac_time_value (str): ac_time_value凭证
             bvid (str): 视频BV号
             violation_words (list): 违禁词列表
+            logger (Logger): 日志记录器
         """
+        self.logger = logger
         self.credential = Credential(sessdata=sessdata, bili_jct=bili_jct, ac_time_value=ac_time_value)
-        self._check_refresh()
-        self.video = video.Video(bvid=bvid)
-        self.av_id = self.video.get_aid()
+        await self._check_refresh()
+        self.av_id = video.Video(bvid=bvid).get_aid()
         self.violation_words = violation_words or []
         self.violation_users_file = "violation_users.json"
-        self.violation_users = self._load_violation_users()
+        self.violation_users = await self._load_violation_users()
         self.comment_queue = deque()  # 评论处理队列
         self.blacklist_queue = deque()  # 拉黑处理队列
         self.violation_check_queue = asyncio.Queue() # 违禁词检查队列
     
-    def _check_refresh(self) -> None:
+    async def _check_refresh(self) -> None:
         """
         检查登录凭证是否需要刷新
         """
-        logger.info("检查登录凭证是否需要刷新")
+        self.logger.info("检查登录凭证是否需要刷新")
         try:
             if sync(self.credential.check_refresh()):
-                logger.info("登录凭证已过期")
+                self.logger.info("登录凭证已过期")
                 sync(self.credential.refresh())
-                logger.info("登录凭证已刷新")
+                self.logger.info("登录凭证已刷新")
             else:
-                logger.info("登录凭证有效，无需刷新")
+                self.logger.info("登录凭证有效，无需刷新")
         except Exception as e:
-            logger.error(f"刷新登录凭证时发生错误: {e}")
-            logger.debug(traceback.format_exc())
+            self.logger.error(f"刷新登录凭证时发生错误: {e}")
+            self.logger.debug(traceback.format_exc())
 
-    def _load_violation_users(self) -> List[Dict[str, Any]]:
+    async def _load_violation_users(self) -> List[Dict[str, Any]]:
         """
         加载违规用户信息
         
@@ -74,22 +84,22 @@ class BilibiliCommentManager:
         if os.path.exists(self.violation_users_file):
             try:
                 with open(self.violation_users_file, 'r', encoding='utf-8') as f:
-                    logger.info("已加载违规用户信息")
+                    self.logger.info("已加载违规用户信息")
                     return json.load(f)
             except Exception as e:
-                logger.error(f"加载违规用户信息失败: {e}")
-                logger.debug(traceback.format_exc())
+                self.logger.error(f"加载违规用户信息失败: {e}")
+                self.logger.debug(traceback.format_exc())
                 return []
         else:
             # 初始化空的违规用户文件
             try:
                 with open(self.violation_users_file, 'w', encoding='utf-8') as f:
-                    logger.info("已创建违规用户文件")
+                    self.logger.info("已创建违规用户文件")
                     json.dump([], f, ensure_ascii=False, indent=4)
                 return []
             except Exception as e:
-                logger.error(f"初始化违规用户文件失败: {e}")
-                logger.debug(traceback.format_exc())
+                self.logger.error(f"初始化违规用户文件失败: {e}")
+                self.logger.debug(traceback.format_exc())
                 return []
 
     async def _save_violation_users(self) -> None:
@@ -99,12 +109,12 @@ class BilibiliCommentManager:
         try:
             with open(self.violation_users_file, 'w', encoding='utf-8') as f:
                 json.dump(self.violation_users, f, ensure_ascii=False, indent=4)
-            logger.info("违规用户信息已保存")
+            self.logger.info("违规用户信息已保存")
         except Exception as e:
-            logger.error(f"保存违规用户信息失败: {e}")
-            logger.debug(traceback.format_exc())
+            self.logger.error(f"保存违规用户信息失败: {e}")
+            self.logger.debug(traceback.format_exc())
 
-    def _check_violation(self, content: str) -> bool:
+    async def _check_violation(self, content: str) -> bool:
         """
         检查内容是否包含违禁词
         
@@ -120,11 +130,11 @@ class BilibiliCommentManager:
                     return True
             return False
         except Exception as e:
-            logger.error(f"检查违禁词时发生错误: {e}")
-            logger.debug(traceback.format_exc())
+            self.logger.error(f"检查违禁词时发生错误: {e}")
+            self.logger.debug(traceback.format_exc())
             return False
 
-    def _update_violation_user(self, username: str, uid: int, rpid: int, content: str) -> None:
+    async def _update_violation_user(self, username: str, uid: int, rpid: int, content: str) -> None:
         """
         更新违规用户信息
         
@@ -164,8 +174,8 @@ class BilibiliCommentManager:
             if self.violation_users[check_index]["violation_count"] == 3:
                 self.blacklist_queue.append(uid)
         except Exception as e:
-            logger.error(f"更新违规用户信息时发生错误: {e}")
-            logger.debug(traceback.format_exc())
+            self.logger.error(f"更新违规用户信息时发生错误: {e}")
+            self.logger.debug(traceback.format_exc())
 
     async def delete_comment(self, rpid) -> None:
         """
@@ -174,19 +184,19 @@ class BilibiliCommentManager:
         Args:
             rpid (int): 评论ID
         """
-        logger.info(f"准备删除评论 {rpid}")
-        #try:
-        #    c = comment.Comment(
-        #        self.av_id,
-        #        comment.CommentResourceType.VIDEO,
-        #        rpid=rpid,
-        #        credential=self.credential
-        #    )
-        #    await c.delete()
-        #    logger.info(f"评论 {rpid} 已删除")
-        #except Exception as e:
-        #    logger.error(f"删除评论 {rpid} 时发生错误: {e}")
-        #    logger.debug(traceback.format_exc())
+        self.logger.info(f"准备删除评论 {rpid}")
+        try:
+            c = comment.Comment(
+                self.av_id,
+                comment.CommentResourceType.VIDEO,
+                rpid=rpid,
+                credential=self.credential
+            )
+            await c.delete()
+            self.logger.info(f"评论 {rpid} 已删除")
+        except Exception as e:
+            self.logger.error(f"删除评论 {rpid} 时发生错误: {e}")
+            self.logger.debug(traceback.format_exc())
 
     async def blacklist_user(self, uid) -> None:
         """
@@ -195,21 +205,21 @@ class BilibiliCommentManager:
         Args:
             uid (int): 用户ID
         """
-        logger.info(f"准备拉黑用户 {uid}")
-        #try:
-        #    if uid not in [621240130]:
-        #        u = user.User(uid=uid, credential=self.credential)
-        #        await u.modify_relation(RelationType.BLOCK)
-        #        logger.info(f"用户 {uid} 已被拉黑")
-#
-        #        # 将该用户的违规次数改为999作为标记
-        #        for user_info in self.violation_users:
-        #            if user_info["uid"] == uid:
-        #                user_info["violation_count"] = 999
-        #                break
-        #except Exception as e:
-        #    logger.error(f"拉黑用户 {uid} 时发生错误: {e}")
-        #    logger.debug(traceback.format_exc())
+        self.logger.info(f"准备拉黑用户 {uid}")
+        try:
+            if uid not in [621240130]:
+                u = user.User(uid=uid, credential=self.credential)
+                await u.modify_relation(RelationType.BLOCK)
+                self.logger.info(f"用户 {uid} 已被拉黑")
+
+                # 将该用户的违规次数改为999作为标记
+                for user_info in self.violation_users:
+                    if user_info["uid"] == uid:
+                        user_info["violation_count"] = 999
+                        break
+        except Exception as e:
+            self.logger.error(f"拉黑用户 {uid} 时发生错误: {e}")
+            self.logger.debug(traceback.format_exc())
 
     async def _get_single_sub_comment(self, rpid: int) -> List[Dict[str, Any]]:
         """
@@ -267,11 +277,11 @@ class BilibiliCommentManager:
                 else:
                     break
             
-            logger.info(f"已获取评论 {rpid} 的全部子评论，共 {len(all_sub_comments)} 条")
+            self.logger.info(f"已获取评论 {rpid} 的全部子评论，共 {len(all_sub_comments)} 条")
             return all_sub_comments
         except Exception as e:
-            logger.error(f"获取评论 {rpid} 的子评论时发生错误: {e}")
-            logger.debug(traceback.format_exc())
+            self.logger.error(f"获取评论 {rpid} 的子评论时发生错误: {e}")
+            self.logger.debug(traceback.format_exc())
             raise e
 
     async def get_comments(self, max_pages=5) -> list[dict]:
@@ -289,7 +299,7 @@ class BilibiliCommentManager:
         try:
             while True:
             
-                logger.info(f"正在获取第 {page} 页评论")
+                self.logger.info(f"正在获取第 {page} 页评论")
                 c = await comment.get_comments(
                     self.av_id, 
                     comment.CommentResourceType.VIDEO, 
@@ -300,8 +310,8 @@ class BilibiliCommentManager:
 
                 replies = c['replies']
                 if not replies:
-                    logger.info(f"第 {page} 页没有评论，已结束")
-                    logger.info(f"共获取{page-1}页评论")
+                    self.logger.info(f"第 {page} 页没有评论，已结束")
+                    self.logger.info(f"共获取{page-1}页评论")
                     break
                 comments.extend(replies)
                 
@@ -317,8 +327,8 @@ class BilibiliCommentManager:
                     break
                 await asyncio.sleep(0.5)
         except Exception as e:
-            logger.error(f"获取评论时发生错误: {e}")
-            logger.debug(traceback.format_exc())
+            self.logger.error(f"获取评论时发生错误: {e}")
+            self.logger.debug(traceback.format_exc())
             raise e
 
         return comments
@@ -355,18 +365,18 @@ class BilibiliCommentManager:
                     continue
                 
                 # 检查是否包含违禁词
-                if self._check_violation(content):
-                    logger.info(f"发现违规{item_type}: {username}({uid}): {content}")
+                if await self._check_violation(content):
+                    self.logger.info(f"发现违规{item_type}: {username}({uid}): {content}")
                     # 更新违规用户信息
-                    self._update_violation_user(username, uid, rpid, content)
+                    await self._update_violation_user(username, uid, rpid, content)
                     # 添加到删除队列
                     self.comment_queue.append(rpid)
                 
                 # 标记该队列任务已完成
                 self.violation_check_queue.task_done()
         except Exception as e:
-            logger.error(f"处理违禁词检查队列时发生错误: {e}")
-            logger.debug(traceback.format_exc())
+            self.logger.error(f"处理违禁词检查队列时发生错误: {e}")
+            self.logger.debug(traceback.format_exc())
 
     async def process_all_comments(self, max_pages=99999) -> None:
         """
@@ -382,7 +392,7 @@ class BilibiliCommentManager:
             # 获取评论
             comments_task = asyncio.create_task(self.get_comments(max_pages=max_pages))
             comments = await comments_task
-            logger.info(f"共获取到 {len(comments)} 条评论")
+            self.logger.info(f"共获取到 {len(comments)} 条评论")
             
             # 提取子评论
             sub_comments_tasks = []
@@ -402,10 +412,10 @@ class BilibiliCommentManager:
                     sub_list = await task
                     sub_comments.extend(sub_list)
                 except Exception as e:
-                    logger.error(f"获取评论 {parent_rpid} 的子评论时发生错误: {e}")
-                    logger.debug(traceback.format_exc())
+                    self.logger.error(f"获取评论 {parent_rpid} 的子评论时发生错误: {e}")
+                    self.logger.debug(traceback.format_exc())
 
-            logger.info(f"共获取到 {len(sub_comments)} 条子评论")
+            self.logger.info(f"共获取到 {len(sub_comments)} 条子评论")
 
             # 等待违禁词检查队列处理完成
             await self.violation_check_queue.join()
@@ -432,8 +442,8 @@ class BilibiliCommentManager:
                 await self.blacklist_user(uid)
                 await asyncio.sleep(0.1)
         except Exception as e:
-            logger.error(f"处理评论时发生错误: {e}")
-            logger.debug(traceback.format_exc())
+            self.logger.error(f"处理评论时发生错误: {e}")
+            self.logger.debug(traceback.format_exc())
 
 
 async def load_config(config_file='config.json'):
@@ -453,43 +463,34 @@ async def load_config(config_file='config.json'):
             config: dict = json.load(f)
         return config
     except Exception as e:
-        logger.error(f"加载配置文件时发生错误: {e}")
-        logger.debug(traceback.format_exc())
-        raise
-
-
-async def main():
-    try:
-        # 从配置文件加载配置
-        config = await load_config()
-
-        # 初始化评论管理器
-        manager = BilibiliCommentManager(
-            sessdata=config.get("sessdata",""),
-            bili_jct=config.get("bili_jct",""),
-            bvid=config.get("bvid",""),
-            ac_time_value=config.get("ac_time_value", ""),
-            violation_words=config.get("violation_words", [""])  # 从配置文件读取违禁词
-        )
-
-        # 定时任务循环
-        interval = config.get("interval", 300)  # 默认5分钟(300秒)
-        
-        # 立即执行一次
-        await manager.process_all_comments(
-            max_pages=config.get("max_pages", 9999)
-        )
-        
-        # 循环执行
-        while True:
-            await asyncio.sleep(interval)
-            await manager.process_all_comments(
-                max_pages=config.get("max_pages", 9999)
-            )
-    except Exception as e:
-        logger.error(f"程序运行时发生错误: {e}")
-        logger.debug(traceback.format_exc())
-
+        raise Exception
 
 if __name__ == "__main__":
+    async def main():
+        try:
+            logger = setup_logger(filename='bot', cmd_level="INFO")
+            # 从配置文件加载配置
+            config = await load_config()
+            # 定时任务循环
+            interval = config.get("interval", 300)  # 默认5分钟(300秒)
+
+            # 初始化评论管理器
+            manager = BilibiliCommentManager(
+                sessdata=config.get("sessdata",""),
+                bili_jct=config.get("bili_jct",""),
+                bvid=config.get("bvid",""),
+                ac_time_value=config.get("ac_time_value", ""),
+                violation_words=config.get("violation_words", [""]),
+                logger=logger
+            )
+
+            # 循环执行
+            while True:
+                await manager.process_all_comments(
+                    max_pages=config.get("max_pages", 9999)
+                )
+                await asyncio.sleep(interval)
+        except Exception as e:
+            logger.error(f"程序运行时发生错误: {e}")
+            logger.debug(traceback.format_exc())
     asyncio.run(main())
