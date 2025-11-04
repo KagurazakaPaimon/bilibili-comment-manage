@@ -1,2 +1,2 @@
-selenium
-datetime
+bilibili-api-python
+curl_cffi

@@ -1,61 +1,100 @@
 >[!NOTE]
->该代码**部分**由AI完成,欢迎PR提出修改，或者提交Issue告诉我该如何改进，谢谢大家！
+>该项目**部分**由AI完成,欢迎PR提出修改,或者提交Issue告诉我们如何改进,谢谢大家!
 
-## 直链（不会做徽章qwq）
-[Releases](https://github.com/paimonanimation/releases)
+<div align="center">
 
-[Issues](https://github.com/PaimonAnimation/bilibili-comment-manage/issues)
+# Bilibili-Comment-Manage
 
-[Gitee镜像](https://gitee.com/paimonanimation/bilibili-comment-manage)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org)
+[![Developed with](https://img.shields.io/badge/developed%20with-python%203.12.4-blue)](https://www.python.org)
 
-[派蒙的博客](https://paimonmeow.cn)
+[![LICENSE](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/PaimonAnimation/bilibili-comment-manage)](https://github.com/PaimonAnimation/bilibili-comment-manage/releases)
+[![Issues](https://img.shields.io/badge/issues-welcome-red)](https://github.com/PaimonAnimation/bilibili-comment-manage/issues)
+[![Blog](https://img.shields.io/badge/blog-派蒙的博客-blue)](https://paimonmeow.cn)
 
-# 简介
-脑抽的时候突发奇想写的，想到**B站没有违禁词检测删除**功能就用`Selenium`库写了一个。
+</div>
 
-# 功能
-1. 定时轮询评论区：
-使用 `while True` 实现无限循环，每隔随机时间（2-5分钟）轮询一次评论区。<br>
-使用 ``` time.sleep() ``` 控制轮询间隔。
-2. 违规词检测：
-定义 ```violation_words``` 列表，存储需要检测的违规词。
-在 ```clean_comments``` 函数中，遍历每个评论内容，检查是否包含违规词。
-3. 删除违规评论：
-使用 Selenium 获取评论内容和删除按钮，模拟用户点击删除按钮。
-如果评论包含违规词，删除该评论。
-4. 用户违规次数统计：
-使用字典 ```user_violation_count``` 记录每个用户的违规次数。
-每次发现违规评论时，更新对应用户的违规计数。
-5. 拉黑用户：
-当用户的违规次数超过 3 次时，调用 ```blacklist_user``` 函数拉黑该用户。
-模拟用户点击拉黑按钮，并确认操作。
-6. 错误处理：
-使用异常处理机制，捕获可能的错误（如元素未找到、页面加载失败等）。*如果连续三次出现错误，程序会暂停 5 分钟后重试。*
+## 简介
+这是一个用于自动管理和清理B站视频评论区的工具.
 
-# 使用方法
-1. 请先从[这里](https://www.python.org/ftp/python/3.13.2/python-3.13.2-amd64.exe)下载Python 3.13。
->[!TIP]
->你也可以在 Microsoft Store 里下载Python。
->![Microsoft Store截图](https://github.com/PaimonAnimation/bilibili-comment-manage/blob/main/pictures/1.png)
-2. 在[releases](https://github.com/PaimonAnimation/bilibili-comment-manage/releases/)里下载zip包。（包含程序源码、Driver和 `requirements.txt` 。
->[!NOTE]
->Release里包含了**Edge**和**Chrome**两个版本的包，请根据**实际情况**选择使用相应的程序源码，并安装相应的Driver。
-3. 拿到程序文件之后，先安装 `requirements.txt` 里面的依赖。<br>然后你可以在 IDLE、命令行或者VSC里直接运行了！~~其实是我懒得编译~~
->[!IMPORTANT]
->请**按照注释，按需修改**代码第125、130和131行的内容。
->![截图](https://github.com/PaimonAnimation/bilibili-comment-manage/blob/main/pictures/2.png)
+现在项目已升级为基于[bilibili-api](https://github.com/Nemo2011/bilibili-api)的现代化版本.
 
-# 更新记录
+本工具能够自动检测含有违禁词的评论,删除这些评论,并在用户多次违规后将其拉黑.
 
-## 2.3（画大饼）
-- [ ] 把数据库文件修改为 `yaml` 格式
-- [ ] 继续添加 Firefox 浏览器的支持
+## 功能特性
+1. **定时轮询评论区**
+   - 使用异步任务实现非阻塞性查询
+   - 默认每隔5分钟检查一次评论区(可配置)
 
-## 2.2 (Feb 21 2025)
-更新了Edge支持
+2. **违禁词检测**
+   - 支持正则表达式匹配
+   - 可自定义违禁词列表
 
-## 2.1 (---)
-**被派蒙吃了**
+3. **自动删除违规评论**
+   - 检测到含有违禁词的评论后自动删除
 
-## 2.0 (Feb 20 2025)
-新建了仓库（大嘘）
+4. **用户违规统计**
+   - 记录每个用户的违规次数
+   - 保存违规用户的详细信息
+
+5. **自动拉黑机制**
+   - 当用户违规次数达到3次时自动拉黑该用户
+
+6. **完善的日志系统**
+   - 日志按天分割,便于查阅
+   - 详细的错误追踪信息
+   - 控制台输出info信息(可调为debug),log文件记录debug信息
+
+7. **配置文件支持**
+   - 通过`config.json`配置各项参数
+
+## 使用方法
+1. 安装Python3.9+
+   > 推荐从使用3.12/3.13
+   
+2. 克隆或下载本项目
+
+3. 安装依赖
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. 配置`config.json`文件:
+   - `sessdata`, `bili_jct`, `ac_time_value`: B站账号凭证
+   - `bvid`: 目标视频的BV号
+   - `violation_words`: 违禁词列表
+   - `interval`: 轮询间隔(秒)
+   - `max_pages`: 最大获取评论页数(默认不用动)
+
+5. 运行程序
+   ```bash
+   python app.py
+   ```
+
+## 获取B站凭证
+1.  需要在浏览器先登录账号后再f12中获取,具体查看[bilibili_api的开发文档](https://nemo2011.github.io/bilibili-api/#/get-credential)
+
+2.  将这些值填入`config.json`对应字段
+
+## 未来计划
+- [ ] 支持代理(可防止412风控)
+
+## 更新记录
+
+### 3.0 (Nov 02 2025)
+- 重构
+- 使用api获取主要数据
+- 使用配置文件更改主要配置
+- 全异步架构
+- 可以作为模块在其他程序中调用
+- 完整的日志支持
+
+### 2.2 (Feb 21 2025)
+- 更新了Edge浏览器支持
+
+### 2.1 (---)
+- **被派蒙吃了**
+
+### 2.0 (Feb 20 2025)
+- 新建仓库
