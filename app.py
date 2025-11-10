@@ -28,12 +28,13 @@ from logger import setup_logger
 # {sub_comment['content']} 内容
 
 class BilibiliCommentManager:
-    async def __init__(
+    def __init__(
                         self, 
                         sessdata:str, 
                         bili_jct:str, 
                         bvid:str, 
                         ac_time_value:str, 
+                        whitelist:list[int],
                         violation_words:list[str],
                         logger:Logger) -> None:
         """
@@ -48,17 +49,18 @@ class BilibiliCommentManager:
             logger (Logger): 日志记录器
         """
         self.logger = logger
+        self.whitelist = whitelist
         self.credential = Credential(sessdata=sessdata, bili_jct=bili_jct, ac_time_value=ac_time_value)
-        await self._check_refresh()
+        self._check_refresh()
         self.av_id = video.Video(bvid=bvid).get_aid()
         self.violation_words = violation_words or []
         self.violation_users_file = "violation_users.json"
-        self.violation_users = await self._load_violation_users()
+        self.violation_users = self._load_violation_users()
         self.comment_queue = deque()  # 评论处理队列
         self.blacklist_queue = deque()  # 拉黑处理队列
         self.violation_check_queue = asyncio.Queue() # 违禁词检查队列
     
-    async def _check_refresh(self) -> None:
+    def _check_refresh(self) -> None:
         """
         检查登录凭证是否需要刷新
         """
@@ -74,7 +76,7 @@ class BilibiliCommentManager:
             self.logger.error(f"刷新登录凭证时发生错误: {e}")
             self.logger.debug(traceback.format_exc())
 
-    async def _load_violation_users(self) -> List[Dict[str, Any]]:
+    def _load_violation_users(self) -> List[Dict[str, Any]]:
         """
         加载违规用户信息
         
@@ -207,7 +209,7 @@ class BilibiliCommentManager:
         """
         self.logger.info(f"准备拉黑用户 {uid}")
         try:
-            if uid not in [621240130]:
+            if uid not in self.whitelist:
                 u = user.User(uid=uid, credential=self.credential)
                 await u.modify_relation(RelationType.BLOCK)
                 self.logger.info(f"用户 {uid} 已被拉黑")
@@ -480,6 +482,7 @@ if __name__ == "__main__":
                 bili_jct=config.get("bili_jct",""),
                 bvid=config.get("bvid",""),
                 ac_time_value=config.get("ac_time_value", ""),
+                whitelist=config.get("whitelist", []),
                 violation_words=config.get("violation_words", [""]),
                 logger=logger
             )

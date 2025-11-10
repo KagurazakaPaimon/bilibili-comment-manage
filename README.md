@@ -64,6 +64,7 @@
    - `sessdata`, `bili_jct`, `ac_time_value`: B站账号凭证
    - `bvid`: 目标视频的BV号
    - `violation_words`: 违禁词列表
+   - `whitelist`:`list[int]` 拉黑白名单列表
    - `interval`: 轮询间隔(秒)
    - `max_pages`: 最大获取评论页数(默认不用动)
 
